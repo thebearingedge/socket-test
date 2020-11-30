@@ -15,5 +15,8 @@
   "license": "ISC",
   "devDependencies": {
     "nodemon": "2.0.1"
+  },
+  "dependencies": {
+    "dotenv": "8.2.0"
   }
 }

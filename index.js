@@ -1,9 +1,8 @@
-const fs = require('fs')
+require('dotenv/config')
 const net = require('net')
 
 let nextId = 1
 const clients = new Set()
-const SOCKET_PATH = '/tmp/test.sock'
 
 const server = net.createServer(client => {
   client.id = nextId++
@@ -25,7 +24,6 @@ const server = net.createServer(client => {
 const teardown = err => {
   clients.forEach(client => client.end())
   server.listening && server.close()
-  fs.existsSync(SOCKET_PATH) && fs.unlinkSync(SOCKET_PATH)
   if (err) {
     console.error(err)
     process.exit(1)
@@ -35,6 +33,6 @@ const teardown = err => {
 process.on('SIGINT', () => teardown(null))
 process.on('uncaughtException', err => teardown(err))
 
-server.listen(SOCKET_PATH, () => {
-  console.log('\u001bcsocket server listening at', SOCKET_PATH)
+server.listen(process.env.PORT, () => {
+  console.log('\u001bcsocket server listening at', process.env.PORT)
 })
