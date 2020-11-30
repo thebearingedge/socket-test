@@ -7,18 +7,28 @@ const clients = new Set()
 const server = net.createServer(client => {
   client.id = nextId++
   clients.add(client)
-  console.log(`client #${client.id} connected.`)
+  console.log(`client #${client.id} connected`)
   client.setEncoding('utf8')
-  client.on('data', data => {
-    console.log(`client #${client.id}: "${data.trim()}"`)
+  client.write('what is your name?\n')
+  client.once('data', name => {
+    client.name = name.trim()
+    process.stdout.write(`client #${client.id} is "${client.name}"\n`)
     clients.forEach(other => {
       if (client === other) return
-      other.write(`client #${client.id}: "${data.trim()}"\n`)
+      other.write(`"${client.name}" joined!\n`)
+    })
+    client.on('data', data => {
+      process.stdout.write(`${client.name}: "${data.trim()}"\n`)
+      clients.forEach(other => {
+        if (client === other || !client.name) return
+        other.write(`${client.name}: "${data.trim()}"\n`)
+      })
     })
   })
   client.on('end', () => {
     clients.delete(client)
-    console.log(`client #${client.id} disconnected.`)
+    clients.forEach(other => other.write(`"${client.name}" left\n`))
+    process.stdout.write(`"${client.name}" left\n`)
   })
 })
 
