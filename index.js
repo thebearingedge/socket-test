@@ -10,6 +10,7 @@ const server = net.createServer(client => {
   console.log(`client #${client.id} connected.`)
   client.setEncoding('utf8')
   client.on('data', data => {
+    console.log(`client #${client.id}: "${data.trim()}"\n`)
     clients.forEach(other => {
       if (client === other) return
       other.write(`client #${client.id}: "${data.trim()}"\n`)
