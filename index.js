@@ -1,31 +1,49 @@
-const fs = require('fs')
 const net = require('net')
 
 let nextId = 1
 const clients = new Set()
-const SOCKET_PATH = '/tmp/test.sock'
 
-const server = net.createServer(client => {
-  client.id = nextId++
-  clients.add(client)
-  console.log(`client #${client.id} connected.`)
-  client.setEncoding('utf8')
-  client.on('data', data => {
+function handleClientJoined(name) {
+
+  const username = name.toLowerCase().trim()
+  if (username === '') {
+    this.write('please enter a username to join...\n\n')
+    this.once('data', handleClientJoined)
+    return
+  }
+
+  const userId = `${username}#${String(nextId++).padStart(4, '0')}`
+
+  this.write(`\nyour id is ${userId}\ntype a message to chat\n`)
+
+  clients.forEach(other => other.write(`\n${userId} has joined the chat.\n`))
+
+  this.once('end', () => {
+    clients.delete(this)
+    clients.forEach(other => other.write(`\n${userId} has left the chat.\n`))
+  })
+
+  this.on('data', data => {
+    const message = data.trim()
+    if (message === '') return
     clients.forEach(other => {
-      if (client === other) return
-      other.write(`client #${client.id}: "${data.trim()}"\n`)
+      if (other === this) return
+      other.write(`${userId}: "${data.trim()}"\n`)
     })
   })
-  client.on('end', () => {
-    clients.delete(client)
-    console.log(`client #${client.id} disconnected.`)
-  })
+
+  clients.add(this)
+}
+
+const server = net.createServer(client => {
+  client.setEncoding('utf8')
+  client.write('please enter a username to join...\n\n')
+  client.once('data', handleClientJoined)
 })
 
 const teardown = err => {
   clients.forEach(client => client.end())
   server.listening && server.close()
-  fs.existsSync(SOCKET_PATH) && fs.unlinkSync(SOCKET_PATH)
   if (err) {
     console.error(err)
     process.exit(1)
@@ -35,6 +53,6 @@ const teardown = err => {
 process.on('SIGINT', () => teardown(null))
 process.on('uncaughtException', err => teardown(err))
 
-server.listen(SOCKET_PATH, () => {
-  console.log('\u001bcsocket server listening at', SOCKET_PATH)
+server.listen(process.env.PORT, () => {
+  console.log('\u001bcnet server listening at', process.env.PORT)
 })
