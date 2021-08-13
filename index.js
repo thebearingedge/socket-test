@@ -1,6 +1,7 @@
 const net = require('net')
 
 let nextId = 1
+let isClosing = false
 const clients = new Set()
 
 function handleClientJoined(name) {
@@ -14,11 +15,12 @@ function handleClientJoined(name) {
 
   const userId = `${username}#${String(nextId++).padStart(4, '0')}`
 
-  this.write(`\nyour id is ${userId}\ntype a message to chat\n`)
+  this.write(`\nyour id is ${userId}\ntype a message to chat...\n\n`)
 
   clients.forEach(other => other.write(`\n${userId} has joined the chat.\n`))
 
   this.once('end', () => {
+    if (isClosing) return
     clients.delete(this)
     clients.forEach(other => other.write(`\n${userId} has left the chat.\n`))
   })
@@ -28,7 +30,7 @@ function handleClientJoined(name) {
     if (message === '') return
     clients.forEach(other => {
       if (other === this) return
-      other.write(`${userId}: "${data.trim()}"\n`)
+      other.write(`${userId}: "${message}"\n`)
     })
   })
 
@@ -42,6 +44,7 @@ const server = net.createServer(client => {
 })
 
 const teardown = err => {
+  isClosing = true
   clients.forEach(client => client.end())
   server.listening && server.close()
   if (err) {
