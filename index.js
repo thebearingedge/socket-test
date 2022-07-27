@@ -1,60 +1,61 @@
 const net = require('net')
+const readline = require('readline')
 
 let nextId = 1
-let isClosing = false
 const clients = new Set()
+const SYSTEM = Symbol('system')
 
-function handleClientJoined(name) {
-
+const handleClientJoined = client => name => {
   const username = name.toLowerCase().trim()
   if (username === '') {
-    this.write('please enter a username to join...\n\n')
-    this.once('data', handleClientJoined)
-    return
+    return client.question(
+      'please enter a username to join chat...\n\nusername: ',
+      handleClientJoined(client)
+    )
   }
-
-  const userId = `${username}#${String(nextId++).padStart(4, '0')}`
-
-  this.write(`\nyour id is ${userId}\ntype a message to chat...\n\n`)
-
-  clients.forEach(other => other.write(`\n${userId} has joined the chat.\n`))
-
-  this.once('end', () => {
-    if (isClosing) return
-    clients.delete(this)
-    clients.forEach(other => other.write(`\n${userId} has left the chat.\n`))
+  const tag = `${username}#${String(nextId++).padStart(4, '0')}`
+  clients.add(client)
+  client.on('close', () => {
+    broadcast(SYSTEM, `${tag} left`)
+    clients.delete(client)
   })
-
-  this.on('data', data => {
-    const message = data.trim()
-    if (message === '') return
-    clients.forEach(other => {
-      if (other === this) return
-      other.write(`${userId}: "${message}"\n`)
-    })
+  client.on('line', message => {
+    readline.moveCursor(client.socket, 0, -1)
+    broadcast(tag, message.trim() || '...')
   })
-
-  clients.add(this)
+  broadcast(SYSTEM, `${tag} joined`)
 }
 
-const server = net.createServer(client => {
-  client.setEncoding('utf8')
-  client.write('please enter a username to join...\n\n')
-  client.once('data', handleClientJoined)
+function broadcast(tag, message) {
+  if (tag === SYSTEM) {
+    message = [
+      '-'.repeat(message.length),
+      message,
+      '-'.repeat(message.length),
+    ].join('\n')
+  } else {
+    message = `${new Date().toLocaleTimeString()} - ${tag}: ${message}`
+  }
+  clients.forEach(other => {
+    readline.clearLine(other.socket, 0)
+    readline.cursorTo(other.socket, 0)
+    other.socket.write(`${message}`)
+    other.prompt(true)
+  })
+}
+
+const server = net.createServer(socket => {
+  const client = readline.createInterface({
+    input: socket,
+    output: socket
+  })
+  client.socket = socket
+  client.setPrompt('\n> ')
+  client.question(
+    'please enter a username to join chat...\n\nusername: ',
+    handleClientJoined(client)
+  )
 })
-
-const teardown = err => {
-  isClosing = true
-  clients.forEach(client => client.end())
-  server.listening && server.close()
-  if (err) {
-    console.error(err)
-    process.exit(1)
-  }
-}
-
-process.on('SIGINT', () => teardown(null))
-process.on('uncaughtException', err => teardown(err))
 
 server.listen(process.env.PORT, () => {
   console.log('\u001bcnet server listening at', process.env.PORT)
