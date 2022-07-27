@@ -4,26 +4,30 @@ const readline = require('readline')
 let nextId = 1
 const clients = new Set()
 const SYSTEM = Symbol('system')
+const usernamePrompt =
+  '\033[2J\033[0;0fplease enter a username to join chat...\n\nusername: '
 
 const handleClientJoined = client => name => {
   const username = name.toLowerCase().trim()
   if (username === '') {
-    return client.question(
-      'please enter a username to join chat...\n\nusername: ',
-      handleClientJoined(client)
-    )
+    return client.question(usernamePrompt, handleClientJoined(client))
   }
   const tag = `${username}#${String(nextId++).padStart(4, '0')}`
-  clients.add(client)
+
   client.on('close', () => {
-    broadcast(SYSTEM, `${tag} left`)
     clients.delete(client)
+    broadcast(SYSTEM, `${tag} left`)
   })
   client.on('line', message => {
-    readline.moveCursor(client.socket, 0, -1)
-    broadcast(tag, message.trim() || '...')
+    if (!message.trim()) return
+    readline.moveCursor(client.output, 0, -1)
+    broadcast(tag, message)
   })
+  client.output.write('\033[2J\033[0;0f')
+  client.setPrompt(`\n${tag}> `)
+  client.prompt()
   broadcast(SYSTEM, `${tag} joined`)
+  clients.add(client)
 }
 
 function broadcast(tag, message) {
@@ -37,10 +41,10 @@ function broadcast(tag, message) {
     message = `${new Date().toLocaleTimeString()} - ${tag}: ${message}`
   }
   clients.forEach(other => {
-    readline.clearLine(other.socket, 0)
-    readline.cursorTo(other.socket, 0)
-    other.socket.write(`${message}`)
-    other.prompt(true)
+    readline.clearLine(other.output, 0)
+    readline.cursorTo(other.output, 0)
+    other.output.write(`${message}`)
+    other.prompt()
   })
 }
 
@@ -49,14 +53,9 @@ const server = net.createServer(socket => {
     input: socket,
     output: socket
   })
-  client.socket = socket
-  client.setPrompt('\n> ')
-  client.question(
-    'please enter a username to join chat...\n\nusername: ',
-    handleClientJoined(client)
-  )
+  client.question(usernamePrompt, handleClientJoined(client))
 })
 
 server.listen(process.env.PORT, () => {
-  console.log('\u001bcnet server listening at', process.env.PORT)
+  console.log('\033[2J\033[0;0fnet server listening at', process.env.PORT)
 })
