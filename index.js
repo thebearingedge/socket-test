@@ -11,7 +11,8 @@ const usernamePrompt =
 const handleClientJoined = client => name => {
   const username = name.toLowerCase().trim()
   if (username === '') {
-    return client.question(usernamePrompt, handleClientJoined(client))
+    client.question(usernamePrompt, handleClientJoined(client))
+    return
   }
   const tag = `${username}#${String(nextId++).padStart(4, '0')}`
   client.on('close', () => {
@@ -58,5 +59,5 @@ const server = net.createServer(socket => {
 })
 
 server.listen(process.env.PORT, () => {
-  console.log('\033[2J\033[0;0fnet server listening at', process.env.PORT)
+  console.log('\033[2J\033[0;0fnet server listening at', server.address().port)
 })
